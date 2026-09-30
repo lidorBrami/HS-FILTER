@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A minimal learned commit rule that decodes masked diffusion language models in fewer forward passes.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:title" content="Six Signals on the Attention Graph">
+<meta property="og:description" content="A minimal learned commit rule for parallel decoding in masked diffusion language models.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='12' width='8' height='8' rx='2' fill='%230f766e'/%3E%3Crect x='12' y='12' width='8' height='8' rx='2' fill='none' stroke='%2394a3b8' stroke-width='2'/%3E%3Crect x='22' y='12' width='8' height='8' rx='2' fill='%230f766e'/%3E%3C/svg%3E">
+<title>Six Signals on the Attention Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one left-aligned column, one measure (--measure) shared by the text, the video, the figure and the table. */
+:root{
+  --bg:#f6f8fb; --surface:#ffffff; --ink:#0f1722; --muted:#4b5668; --rule:#dde3ec;
+  --accent:#0f766e; --accent-strong:#0b5c56; --accent-tint:#e2f3f0;
+  --bar-native:#c5cedb; --code-bg:#edf1f6; --figure-bg:#ffffff;
+  --measure:56rem;
+  --font-display:"Bricolage Grotesque","IBM Plex Sans",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c1118; --surface:#131a24; --ink:#e6ebf2; --muted:#9aa7b8; --rule:#253044;
+    --accent:#2dd4bf; --accent-strong:#5eead4; --accent-tint:#0f2f2c;
+    --bar-native:#3b4759; --code-bg:#0f1620;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c1118; --surface:#131a24; --ink:#e6ebf2; --muted:#9aa7b8; --rule:#253044;
+  --accent:#2dd4bf; --accent-strong:#5eead4; --accent-tint:#0f2f2c;
+  --bar-native:#3b4759; --code-bg:#0f1620;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:1rem}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+body{margin:0;padding-inline:clamp(1rem,4vw,2rem);background:var(--bg);color:var(--ink);
+  font:400 1.0625rem/1.65 var(--font-body);-webkit-font-smoothing:antialiased}
+img{max-width:100%;height:auto;display:block}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:.18em}
+a:hover{color:var(--accent-strong)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+.wrap{max-width:var(--measure);margin-inline:auto}
+.lead{font-size:clamp(1.1rem,2.1vw,1.2rem);line-height:1.6}
+section{padding-block:clamp(1.5rem,4vw,2.5rem)}
+h1,h2,h3{font-family:var(--font-display);line-height:1.12;letter-spacing:-.015em;text-wrap:balance;margin:0}
+h1{font-size:clamp(2.35rem,6.2vw,4rem);font-weight:700;letter-spacing:-.03em;max-width:16ch}
+h2{font-size:clamp(1.55rem,3.4vw,2.1rem);font-weight:600;margin-bottom:1rem}
+p{margin:0 0 1rem}
+.label{font:500 .78rem/1.2 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 .7rem}
+.fine{font-size:.92rem;color:var(--muted)}
+
+/* Hero */
+.hero{padding-top:clamp(2.25rem,6vw,4.5rem);padding-bottom:.5rem}
+.strip{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.6rem;max-width:34rem}
+.strip i{display:block;height:13px;border-radius:5px}
+.strip .d{background:var(--bar-native)}
+.strip .m{border:1.5px dashed var(--bar-native)}
+.strip .c{background:var(--accent)}
+.subtitle{max-width:38rem;font-size:clamp(1.1rem,2.2vw,1.35rem);line-height:1.4;color:var(--muted);margin:1rem 0 0}
+
+/* Demo */
+.video{margin:0}
+.frame{background:var(--figure-bg);border:1px solid var(--rule);border-radius:10px;padding:.5rem;overflow:hidden}
+.frame img{width:100%;height:auto;border-radius:6px}
+.ctl{margin:.6rem 0 .9rem;display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem}
+.ctl a,figcaption a{font-size:.92rem}
+.linkbtn{font:500 .88rem/1 var(--font-body);background:transparent;border:1px solid var(--rule);color:var(--muted);
+  border-radius:6px;padding:.45rem .75rem;cursor:pointer}
+.linkbtn:hover{color:var(--ink);border-color:var(--muted)}
+
+/* How it works */
+.steps{list-style:none;margin:1.25rem 0 0;padding:0;counter-reset:step;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.5rem 2.25rem}
+.steps li{counter-increment:step;min-width:0}
+.steps li::before{content:counter(step);display:block;font:500 1.05rem/1.4 var(--font-mono);color:var(--accent);margin-bottom:.2rem}
+.steps h3{font:600 1.08rem/1.4 var(--font-body);letter-spacing:0;margin:0 0 .25rem}
+.steps p{margin:0}
+@media (max-width:52rem){.steps{grid-template-columns:minmax(0,1fr)}}
+figure.wide{margin:2rem 0 0}
+figure.wide figcaption{margin-top:.6rem;color:var(--muted);font-size:.92rem}
+
+/* Results */
+.table-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:8px;background:var(--surface);margin:1.25rem 0 .75rem}
+table{border-collapse:collapse;width:100%;min-width:44rem;font:400 .86rem/1.35 var(--font-mono)}
+th,td{padding:.5rem .55rem;text-align:right;white-space:nowrap}
+thead th{font:500 .82rem/1.3 var(--font-body);color:var(--muted);border-bottom:1px solid var(--rule)}
+thead th.method,tbody th{text-align:left}
+th.grp{text-align:center;border-left:1px solid var(--rule)}
+th.sub.g,td.g{border-left:1px solid var(--rule)}
+tbody th{font:500 .95rem/1.35 var(--font-body);color:var(--ink);position:sticky;left:0;background:inherit}
+tbody tr{background:var(--surface)}
+tbody tr.ours{background:var(--accent-tint)}
+tbody tr.sec{background:var(--code-bg)}
+tbody tr.sec th{position:static;font:500 .74rem/1 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:.6rem .7rem}
+tbody tr.sec th span{position:sticky;left:.7rem;display:inline-block}
+tbody tr+tr>*{border-top:1px solid var(--rule)}
+td.b{font-weight:600}
+td.na{color:var(--muted)}
+.tag{font:500 .66rem/1 var(--font-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--accent-strong);margin-left:.45rem}
+.note{font-size:.9rem;color:var(--muted)}
+
+main{padding-bottom:3rem}
+</style>
+</head>
+<body>
+<header class="hero wrap">
+  <div class="strip" aria-hidden="true"><i class="d" style="width:30px"></i><i class="d" style="width:52px"></i><i class="d" style="width:22px"></i><i class="d" style="width:44px"></i><i class="d" style="width:36px"></i><i class="d" style="width:26px"></i><i class="d" style="width:58px"></i><i class="d" style="width:34px"></i><i class="m" style="width:20px"></i><i class="m" style="width:46px"></i><i class="c" style="width:28px"></i><i class="m" style="width:40px"></i><i class="m" style="width:30px"></i><i class="m" style="width:52px"></i><i class="c" style="width:22px"></i><i class="m" style="width:44px"></i><i class="m" style="width:36px"></i><i class="m" style="width:26px"></i><i class="m" style="width:58px"></i><i class="c" style="width:34px"></i><i class="m" style="width:20px"></i><i class="m" style="width:46px"></i><i class="m" style="width:28px"></i><i class="c" style="width:40px"></i></div>
+  <h1>Six Signals on the Attention Graph</h1>
+  <p class="subtitle">A Minimal Learned Commit Rule for Parallel Decoding in Masked Diffusion Language Models</p>
+</header>
+
+<main>
+<section class="wrap" aria-label="Decoding demo">
+  <p class="label">HS-Filter against native decoding</p>
+  <p class="lead">One prompt decoded twice. Native LLaDA commits one token per forward pass and needs 148 passes. HS-Filter, the heavier router of the paper, commits several at once and finishes in 37. Both reach the correct result, 32.</p>
+  <figure class="video">
+    <div class="frame">
+      <img id="demo" src="assets/decode_demo.gif" data-gif="assets/decode_demo.gif" data-still="assets/decode_demo_end.png" width="880" height="813"
+           alt="Two panels decode the same GSM8K question. Native LLaDA fills one token per forward pass and needs 148 passes. HS-Filter commits several tokens per pass and finishes in 37. Both reach the correct result, 32.">
+    </div>
+    <div class="ctl"><button id="demo-toggle" class="linkbtn" type="button" hidden>Stop animation</button><a href="assets/decode_demo.gif" target="_blank" rel="noopener">Open full size</a></div>
+  </figure>
+  <p class="fine">A real trace on GSM8K test problem 312 (LLaDA-8B-Instruct), not a mock-up. The problem was picked because its solution is short.</p>
+</section>
+
+<section class="wrap" id="how">
+  <h2>How it works</h2>
+    <p class="lead">A masked diffusion language model writes text by unmasking positions over several forward passes, so the cost of a response is the number of passes. Native decoding commits one position per pass. We train two small routers, Feature-Filter and the heavier HS-Filter, that choose at every pass which masked positions can be committed together.</p>
+  <ol class="steps">
+    <li><h3>Graph</h3><p>The attention of the pass gives a sparse graph of which positions depend on which, the same graph DAWN builds.</p></li>
+    <li><h3>Score</h3><p>A small network scores every masked position by message passing on that graph. Feature-Filter reads only six signals per position: confidence, entropy, and four statistics of the graph (in-mass, max-in, degree, degree-weighted confidence). HS-Filter, shown below, reads hidden states from five backbone layers and six logit scalars.</p></li>
+    <li><h3>Commit</h3><p>Feature-Filter acts in bulk only if some score clears a gate of 0.99. It then commits every position whose score, minus a penalty proportional to the share of its attention that points at tokens committed in the same step, exceeds 0.80. Otherwise it commits the native top-1 alone. HS-Filter commits every position scoring at least 0.90, plus the native top-1.</p></li>
+  </ol>
+  <figure class="wide">
+    <div class="frame"><img src="assets/hs_filter_overview.png" width="1800" height="880" alt="Diagram of one HS-Filter step. The frozen backbone's attention becomes a dependency graph. A two-layer GCN scores each masked position from hidden states of layers 2, 9, 16, 23 and 30 plus six logit scalars. Every position scoring at least 0.90, plus the native top-1, is committed."></div>
+    <figcaption>One HS-Filter step: attention becomes a dependency graph, a two-layer GCN scores every masked position, and every position scoring at least 0.90 is committed together with the native top-1. <a href="assets/hs_filter_overview.png" target="_blank" rel="noopener">Open full size</a></figcaption>
+  </figure>
+</section>
+
+<section class="wrap" id="results">
+  <h2>Results</h2>
+    <p class="lead">Feature-Filter uses fewer forward passes than every baseline on both backbones: on average 48.7 against 52.6 for DAWN on LLaDA, and 52.7 against 63.3 for DAWN on Dream. Its mean accuracy is 0.5 points below the most accurate baseline (Fast-dLLM) on LLaDA and 1.7 points below it on Dream, differences of the same order as the evaluation's standard error. HS-Filter reaches 41.4 passes on LLaDA, the fewest of any row, but its mean accuracy is 4.0 points below Fast-dLLM's.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th class="method" rowspan="2" scope="col">Method</th><th class="grp" colspan="2" scope="colgroup">GSM8K</th><th class="grp" colspan="2" scope="colgroup">MATH</th><th class="grp" colspan="2" scope="colgroup">MBPP</th><th class="grp" colspan="2" scope="colgroup">HumanEval</th><th class="grp" colspan="4" scope="colgroup">Average</th></tr>
+        <tr><th class="sub g" scope="col">Acc ↑</th><th class="sub" scope="col">NFE ↓</th><th class="sub g" scope="col">Acc ↑</th><th class="sub" scope="col">NFE ↓</th><th class="sub g" scope="col">Acc ↑</th><th class="sub" scope="col">NFE ↓</th><th class="sub g" scope="col">Acc ↑</th><th class="sub" scope="col">NFE ↓</th><th class="sub g" scope="col">Acc ↑</th><th class="sub" scope="col">NFE ↓</th><th class="sub" scope="col">tok/s ↑</th><th class="sub" scope="col">Speedup ↑</th></tr>
+      </thead>
+      <tbody>
+        <tr class="sec"><th colspan="13" scope="colgroup"><span>LLaDA-8B-Instruct</span></th></tr>
+        <tr><th scope="row">Native</th><td class="g">77.33</td><td>237.4</td><td class="g">38.42</td><td>246.7</td><td class="g">29.40</td><td>188.2</td><td class="g">35.98</td><td>247.1</td><td class="g">45.28</td><td>229.9</td><td>33</td><td>1.00×</td></tr>
+        <tr><th scope="row">Fast-dLLM</th><td class="g">77.71</td><td>77.7</td><td class="g">38.28</td><td>96.0</td><td class="g">35.40</td><td>39.5</td><td class="g">38.41</td><td>50.7</td><td class="g">47.45</td><td>66.0</td><td>92</td><td>2.79×</td></tr>
+        <tr><th scope="row">DAWN</th><td class="g">76.88</td><td>60.1</td><td class="g">37.54</td><td>77.4</td><td class="g">34.20</td><td>32.4</td><td class="g">38.41</td><td>40.7</td><td class="g">46.76</td><td>52.6</td><td>113</td><td>3.42×</td></tr>
+        <tr><th scope="row">L2P</th><td class="g">77.86</td><td>62.9</td><td class="g">37.52</td><td>78.2</td><td class="g">30.40</td><td>56.1</td><td class="g">35.37</td><td>78.2</td><td class="g">45.29</td><td>68.8</td><td>110</td><td>3.33×</td></tr>
+        <tr><th scope="row">DAPD</th><td class="g">72.40</td><td>108.9</td><td class="g">34.26</td><td>118.8</td><td class="g">33.20</td><td>63.7</td><td class="g">42.07</td><td>74.6</td><td class="g">45.48</td><td>91.5</td><td>42</td><td>1.27×</td></tr>
+        <tr class="ours"><th scope="row">HS-Filter<span class="tag">ours</span></th><td class="g">75.51</td><td class="b">52.3</td><td class="g">34.86</td><td class="b">56.3</td><td class="g">31.80</td><td class="b">27.3</td><td class="g">31.71</td><td class="b">29.6</td><td class="g">43.47</td><td class="b">41.4</td><td>112</td><td>3.39×</td></tr>
+        <tr class="ours"><th scope="row">Feature-Filter<span class="tag">ours</span></th><td class="g">78.09</td><td class="b">56.1</td><td class="g">38.14</td><td class="b">72.4</td><td class="g">33.60</td><td class="b">29.4</td><td class="g">37.80</td><td class="b">36.8</td><td class="g">46.91</td><td class="b">48.7</td><td class="b">114</td><td class="b">3.45×</td></tr>
+        <tr class="sec"><th colspan="13" scope="colgroup"><span>Dream-v0-Instruct-7B</span></th></tr>
+        <tr><th scope="row">Native</th><td class="g">76.19</td><td>137.7</td><td class="g">45.86</td><td>252.9</td><td class="g">54.00</td><td>124.8</td><td class="g">59.15</td><td>177.2</td><td class="g">58.80</td><td>173.2</td><td>49</td><td>1.00×</td></tr>
+        <tr><th scope="row">Fast-dLLM</th><td class="g">76.50</td><td>58.3</td><td class="g">45.70</td><td>115.6</td><td class="g">55.80</td><td>59.9</td><td class="g">60.37</td><td>87.2</td><td class="g">59.59</td><td>80.2</td><td>100</td><td>2.04×</td></tr>
+        <tr><th scope="row">DAWN</th><td class="g">73.84</td><td>47.7</td><td class="g">44.88</td><td>94.3</td><td class="g">55.40</td><td>39.2</td><td class="g">55.49</td><td>72.1</td><td class="g">57.40</td><td>63.3</td><td>113</td><td>2.31×</td></tr>
+        <tr><th scope="row">L2P†</th><td class="g">77.56</td><td>149.8</td><td class="g">45.38</td><td>189.8</td><td class="g">55.40</td><td>69.7</td><td class="g">54.88</td><td>168.1</td><td class="g">58.30</td><td>144.3</td><td class="na">–</td><td class="na">–</td></tr>
+        <tr class="ours"><th scope="row">Feature-Filter<span class="tag">ours</span></th><td class="g">75.89</td><td class="b">44.4</td><td class="g">44.70</td><td class="b">72.2</td><td class="g">55.00</td><td class="b">27.6</td><td class="g">56.10</td><td class="b">66.6</td><td class="g">57.92</td><td class="b">52.7</td><td class="b">121</td><td class="b">2.47×</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Full test sets, one setting per method across the four benchmarks. NFE is the mean number of forward passes per example (lower is better), tok/s is decoding throughput in tokens per second, and speedup is that throughput divided by the native decoder's on the same backbone. Averages are over the four benchmarks. Shaded rows are ours, and bold marks a value better than every baseline on that backbone. † L2P's Dream row predates the timed harness, so it has no throughput. DAPD was not run on Dream, and HS-Filter was not trained for it.</p>
+</section>
+
+</main>
+
+<script>
+(function () {
+  var img = document.getElementById('demo');
+  var tog = document.getElementById('demo-toggle');
+  if (img && tog) {
+    var playing = true;
+    var set = function (p) {
+      playing = p;
+      img.src = p ? img.dataset.gif : img.dataset.still;
+      tog.textContent = p ? 'Stop animation' : 'Play animation';
+    };
+    tog.hidden = false;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) set(false);
+    tog.addEventListener('click', function () { set(!playing); });
+  }
+})();
+</script>
+</body>
+</html>
